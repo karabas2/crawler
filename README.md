@@ -138,6 +138,22 @@ go run ./main/ --seed=https://go.dev --depth=2 --workers=5 --port=8080
 
 Then open **http://localhost:8080** to access the dashboard.
 
+### Run with Docker
+
+You can easily run the crawler using Docker. A `Dockerfile` and `docker-compose.yml` are provided.
+
+```bash
+# Build and start the container in detached mode
+docker-compose up -d
+
+# Check the logs
+docker-compose logs -f
+
+# Stop the container
+docker-compose down
+```
+The persistence data is automatically mapped to the `./data` folder on your host machine to ensure your crawls are saved across container restarts.
+
 ### Command-Line Flags
 
 | Flag | Default | Description |
