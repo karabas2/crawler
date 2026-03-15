@@ -40,10 +40,11 @@ type App struct {
 	dataDir        string
 
 	// Crawler metadata for the UI
-	crawlerOrigin    string
-	crawlerDepth     int
-	crawlerHitRate   float64
-	crawlerStartedAt time.Time
+	crawlerOrigin     string
+	crawlerDepth      int
+	crawlerHitRate    float64
+	crawlerQueueCap   int
+	crawlerStartedAt  time.Time
 	crawlerLastUpdate time.Time
 }
 
@@ -163,6 +164,7 @@ func main() {
 			"crawler_origin":   app.crawlerOrigin,
 			"crawler_depth":    app.crawlerDepth,
 			"crawler_hit_rate": app.crawlerHitRate,
+			"queue_capacity":   app.crawlerQueueCap,
 			"crawler_started":  "",
 			"crawler_last_update": "",
 		}
@@ -236,6 +238,7 @@ func main() {
 		app.crawlerOrigin = ""
 		app.crawlerDepth = 0
 		app.crawlerHitRate = 0
+		app.crawlerQueueCap = 0
 		app.crawlerStartedAt = time.Time{}
 		app.crawlerLastUpdate = time.Time{}
 		app.mu.Unlock()
@@ -321,6 +324,13 @@ func (app *App) startCrawler(req CrawlRequest) {
 	app.crawlerOrigin = req.OriginURL
 	app.crawlerDepth = req.MaxDepth
 	app.crawlerHitRate = req.HitRate
+	
+	qCap := req.QueueCapacity
+	if qCap <= 0 {
+		qCap = 10000
+	}
+	app.crawlerQueueCap = qCap
+
 	app.crawlerStartedAt = time.Now()
 	app.crawlerLastUpdate = time.Now()
 
