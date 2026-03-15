@@ -45,9 +45,9 @@ Crawls web pages, indexes them in real-time, and serves search queries via HTTP 
 
 The system includes a real-time web dashboard with three tabs:
 
-- **🚀 Create Crawler** — Configure and launch crawlers from the UI with Origin URL, Max Depth, Workers, Hit Rate, Queue Capacity, and Max URLs to Visit.
-- **🔍 Search** — Search indexed pages in real-time while crawling continues.
-- **📊 Crawler Status** — Monitor live metrics including indexing progress, queue depth, back-pressure status, and crawler metadata.
+- ** Create Crawler** — Configure and launch crawlers from the UI with Origin URL, Max Depth, Workers, Hit Rate, Queue Capacity, and Max URLs to Visit.
+- ** Search** — Search indexed pages in real-time while crawling continues.
+- ** Crawler Status** — Monitor live metrics including indexing progress, queue depth, back-pressure status, and crawler metadata.
 
 A stats bar at the top shows URLs Visited, Words in DB, Active Crawlers, and Total Created with a Clear button.
 
