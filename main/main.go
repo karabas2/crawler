@@ -126,9 +126,12 @@ func main() {
 
 	// GET /search?q=<query>
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query().Get("q")
+		query := r.URL.Query().Get("query")
 		if query == "" {
-			http.Error(w, `{"error":"missing query parameter 'q'"}`, http.StatusBadRequest)
+			query = r.URL.Query().Get("q")
+		}
+		if query == "" {
+			http.Error(w, `{"error":"missing query parameter 'query' or 'q'"}`, http.StatusBadRequest)
 			return
 		}
 		results := searchEngine.Search(query)

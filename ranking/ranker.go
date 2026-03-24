@@ -31,21 +31,21 @@ func New() *Ranker {
 //   - titleMatchCount: number of query tokens found in the page title
 //   - bodyKeywordFrequency: total number of query token occurrences in the page body
 func (r *Ranker) Score(page *storage.PageData, queryTokens []string) float64 {
-	titleLower := strings.ToLower(page.Title)
+	var totalFrequency float64
 	bodyLower := strings.ToLower(page.Body)
-
-	var titleMatches float64
-	var bodyFrequency float64
+	titleLower := strings.ToLower(page.Title)
 
 	for _, token := range queryTokens {
-		// Title matching: count how many query tokens appear in the title
-		if strings.Contains(titleLower, token) {
-			titleMatches++
-		}
-
-		// Body keyword frequency: count total occurrences of each query token
-		bodyFrequency += float64(strings.Count(bodyLower, token))
+		// Count occurrences in body and title
+		totalFrequency += float64(strings.Count(bodyLower, token))
+		totalFrequency += float64(strings.Count(titleLower, token))
 	}
 
-	return r.TitleWeight*titleMatches + r.BodyWeight*bodyFrequency
+	if totalFrequency == 0 {
+		return 0
+	}
+
+	// Formula: score = (frequency x 10) + 1000 (exact match bonus) - (depth x 5)
+	score := (totalFrequency * 10) + 1000 - float64(page.Depth*5)
+	return score
 }

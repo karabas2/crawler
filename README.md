@@ -1,3 +1,6 @@
+# Github Repo Link
+https://github.com/karabas2/crawler
+
 # Concurrent Web Crawler & Search Engine
 
 A modular concurrent web crawler and search engine built in Go.  
@@ -108,10 +111,14 @@ project/
 │   └── dashboard.html     # Real-time web dashboard UI
 ├── data/                  # Persisted crawl state (auto-generated)
 ├── go.mod
-├── README.md
-├── product_prd.md
-└── recommendation.md
-```
+## Project Documentation
+
+This project includes comprehensive documentation to meet professional standards:
+
+- **[README.md](README.md)**: This guide (How to run/use).
+- **[product_prd.md](product_prd.md)**: Detailed Product Requirements Document.
+- **[ai_prd.md](ai_prd.md)**: Technical Blueprints & Prompt Specification for AI maintenance.
+- **[recommendation.md](recommendation.md)**: Future roadmap and production scaling advice.
 
 ---
 
@@ -123,8 +130,8 @@ project/
 ### Build & Run
 
 ```bash
-# Navigate to the project
-cd project
+# Navigate to the project directory
+cd ai-aided-hw
 
 # Download dependencies
 go mod tidy
