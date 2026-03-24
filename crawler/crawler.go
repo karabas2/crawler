@@ -455,5 +455,6 @@ func resolveURL(base *url.URL, href string) string {
 	// Strip fragment
 	resolved.Fragment = ""
 
-	return resolved.String()
+	// Strip trailing slash for consistency (e.g. treating /dl and /dl/ as the same)
+	return strings.TrimSuffix(resolved.String(), "/")
 }

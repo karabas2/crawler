@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -110,8 +111,51 @@ func (pm *PersistenceManager) Save() error {
 		return fmt.Errorf("renaming temp file: %w", err)
 	}
 
+	// NEW: Auto-export all words to data/storage/[letter].data
+	go exportLetterData(pm.dataDir, pages)
+
 	log.Printf("[Persistence] Saved %d pages to %s", len(pages), filePath)
 	return nil
+}
+
+// exportLetterData extracts all words and their frequencies, grouping them by their starting letter into [letter].data files
+func exportLetterData(dataDir string, pages []*PageData) {
+	storageDir := filepath.Join(dataDir, "storage")
+	os.MkdirAll(storageDir, 0755)
+
+	letterGroups := make(map[byte][]string)
+
+	for _, page := range pages {
+		combined := strings.ToLower(page.Title + " " + page.Body)
+		words := strings.FieldsFunc(combined, func(r rune) bool {
+			return r < 'a' || r > 'z'
+		})
+
+		freqs := make(map[string]int)
+		for _, w := range words {
+			if len(w) >= 2 { // filter out single letters
+				freqs[w]++
+			}
+		}
+
+		for word, freq := range freqs {
+			firstChar := word[0] // since we filtered 'a' to 'z', it's a valid ascii byte
+			line := fmt.Sprintf("%s %s %s %d %d\n", word, page.URL, page.OriginURL, page.Depth, freq)
+			letterGroups[firstChar] = append(letterGroups[firstChar], line)
+		}
+	}
+
+	for letter, lines := range letterGroups {
+		filePath := filepath.Join(storageDir, fmt.Sprintf("%c.data", letter))
+		f, err := os.Create(filePath)
+		if err != nil {
+			continue
+		}
+		for _, line := range lines {
+			f.WriteString(line)
+		}
+		f.Close()
+	}
 }
 
 // Load reads a previously saved crawl state from disk.
