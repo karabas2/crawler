@@ -1,7 +1,4 @@
-# Multi-Agent Web Crawler & Search Engine (Project 2)
-
-![Go Version](https://img.shields.io/badge/Go-1.18%2B-blue.svg)
-![Project Type](https://img.shields.io/badge/Project-Academic%20Assignment%202-red.svg)
+# Multi-Agent Web Crawler & Search Engine 
 
 A high-performance search engine and web crawler implemented in Go, designed through a collaborative **Multi-Agent AI Workflow**. This system demonstrates complex concurrency patterns, real-time incremental indexing, and thread-safe search operations.
 
