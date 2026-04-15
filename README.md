@@ -1,62 +1,74 @@
 # Multi-Agent Web Crawler & Search Engine (Project 2)
 
-A robust Go-based search engine designed and developed using a multi-agent AI workflow. This system demonstrates advanced concurrency patterns, real-time indexing, and high-performance information retrieval.
+![Go Version](https://img.shields.io/badge/Go-1.18%2B-blue.svg)
+![Project Type](https://img.shields.io/badge/Project-Academic%20Assignment%202-red.svg)
+
+A high-performance search engine and web crawler implemented in Go, designed through a collaborative **Multi-Agent AI Workflow**. This system demonstrates complex concurrency patterns, real-time incremental indexing, and thread-safe search operations.
+
+## 🏗️ Technical Architecture
+
+This project is built from the ground up to handle large-scale crawling on a single machine using standard library primitives.
+
+- **Concurrency Model:** Uses a Worker Pool pattern with `N` concurrent goroutines.
+- **Task Distribution:** Managed via buffered channels to ensure efficient resource utilization.
+- **Real-time Pipeline:** The crawler uses a dedicated `PageCh` to stream results to the Indexer as they are discovered, enabling zero-latency search.
+- **Thread-Safety:** Implements a central `Storage` hub protected by `sync.RWMutex`, allowing multiple searchers to read while a single indexer writes.
 
 ## 🚀 Key Features
 
-- **Multi-Agent Design:** Built using a collaborative workflow between Planner, Crawler, Indexing, Search, and Reviewer agents.
-- **Concurrent BFS Crawler:** High-speed exploration with URL deduplication and a depth limit of `k`.
-- **Real-Time Search:** Search capabilities remain active while the crawler is running, supported by a thread-safe inverted index.
-- **Back-Pressure Management:** Intelligent worker pool and queue depth monitoring to handle load.
-- **Detailed Metadata:** Search results return the `(relevant_url, origin_url, depth)` triple.
-
-## 📁 Project Structure
-
-```bash
-.
-├── agents/             # Multi-agent role definitions & prompts
-├── crawler/            # Concurrent BFS crawling logic
-├── indexer/            # Real-time tokenization & index pipeline
-├── search/             # Query processing & relevance scoring
-├── storage/            # Thread-safe storage with RWMutex
-├── main/               # Application entry point
-├── multi_agent_workflow.md  # Detailed agent interaction log
-└── product_prd.md      # Project requirements & features
-```
-
-## 🛠️ Installation & Usage
-
-### Prerequisites
-- Go 1.18 or higher
-
-### Running the System
-```bash
-go run main/main.go --url https://example.com --depth 2 --workers 10
-```
-
-### Searching
-You can perform searches even while the crawl is active. Use the provided CLI or API interface to query the system.
+- **Recursive BFS Crawling:** Explores the web starting from a seed URL up to a maximum depth `k`.
+- **Intelligent Deduplication:** Never visits the same URL twice using a mutex-protected lookup map.
+- **Dynamic Back-Pressure:** Monitors task queue depth and adjusts indexing speed to prevent memory exhaustion (States: NORMAL, MODERATE, HIGH).
+- **Inverted Indexing:** Maps lowercase keywords to URL locations, optimized for retrieval.
+- **Triple-Metadata Search:** Returns results with `(relevant_url, origin_url, depth)` as required by assignment specs.
 
 ## 🤖 Multi-Agent Development Workflow
 
-This project was developed by mapping the architecture into a multi-agent system. Each component was "designed" by a specialized AI agent:
+This system's design was mapped into a multi-agent development lifecycle:
 
-- **Planner Agent:** Established the system backbone and sync strategies.
-- **Crawler Agent:** Optimized the worker pool and deduplication logic.
-- **Indexing Agent:** Designed the `keyword -> []URL` map and persistence.
-- **Search Agent:** Implemented the ranking algorithm and concurrent search locks.
-- **Reviewer Agent:** Performed stress-testing analysis and verified thread-safety.
+1.  **Planner Agent:** Designed the package structure and inter-service communication.
+2.  **Crawler Agent:** Developed the BFS core and worker pool concurrency logic.
+3.  **Indexing Agent:** Built the tokenization pipeline and inverted index storage.
+4.  **Search Agent:** Implemented the relevance scoring and read-locked query processor.
+5.  **Reviewer Agent:** Audited code for race conditions and verified back-pressure integrity.
 
-For a full breakdown of agent prompts and decisions, see [multi_agent_workflow.md](./multi_agent_workflow.md).
+> See [multi_agent_workflow.md](./multi_agent_workflow.md) for the full agentic reasoning log.
 
-## 📊 Design Decisions: Searching While Indexing
+## 📁 Repository Structure
 
-To ensure the search engine is operational during a crawl:
-1. **Shared State:** All data is held in a central `Storage` struct.
-2. **Locking Strategy:** We use `sync.RWMutex`. 
-   - **Indexer:** Takes a `Lock()` (write) while updating terms.
-   - **Searcher:** Takes a `RLock()` (read) while processing queries.
-3. **Incremental Updates:** New pages are indexed as soon as they are fetched, making results available immediately.
+```bash
+.
+├── agents/             # Markdown definitions of AI development roles
+├── crawler/            # Concurrent BFS engine (Worker Pool & Fetcher)
+├── indexer/            # Tokenization & Real-time Indexing logic
+├── search/             # Query parsing & Relevancy Ranking
+├── storage/            # Memory-efficient Storage with RWMutex
+├── main/               # CLI entry point
+├── multi_agent_workflow.md  # Detailed documentation of AI collaboration
+├── product_prd.md      # Full Product Requirements Document
+└── recommendation.md   # Distributed Scaling Strategy
+```
 
-## 📜 License
+## 🛠️ Installation & Execution
+
+### Prerequisites
+- Go 1.18 or higher
+- External dependency: `golang.org/x/net/html`
+
+### Steps
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   go mod tidy
+   ```
+3. Run a crawl:
+   ```bash
+   go run main/main.go --url https://example.com --depth 3 --workers 20
+   ```
+
+## 📊 Concurrent Search During Indexing
+
+The system is uniquely designed to stay responsive during high-volume crawls. While the **Indexer Agent's** code is busy acquiring `Mu.Lock()` to update keywords, the **Search Agent** utilizes `Mu.RLock()` to fulfill user queries. This ensures that the search engine is never offline while the crawler is running.
+
+## ⚖️ License
 MIT
