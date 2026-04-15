@@ -1,253 +1,62 @@
-# Github Repo Link
-https://github.com/karabas2/crawler
+# Multi-Agent Web Crawler & Search Engine (Project 2)
 
-# Concurrent Web Crawler & Search Engine
+A robust Go-based search engine designed and developed using a multi-agent AI workflow. This system demonstrates advanced concurrency patterns, real-time indexing, and high-performance information retrieval.
 
-A modular concurrent web crawler and search engine built in Go.  
-Crawls web pages, indexes them in real-time, and serves search queries via HTTP — all while crawling continues in the background. Includes a real-time web dashboard for creating crawlers, monitoring progress, and searching indexed pages.
+## 🚀 Key Features
 
----
+- **Multi-Agent Design:** Built using a collaborative workflow between Planner, Crawler, Indexing, Search, and Reviewer agents.
+- **Concurrent BFS Crawler:** High-speed exploration with URL deduplication and a depth limit of `k`.
+- **Real-Time Search:** Search capabilities remain active while the crawler is running, supported by a thread-safe inverted index.
+- **Back-Pressure Management:** Intelligent worker pool and queue depth monitoring to handle load.
+- **Detailed Metadata:** Search results return the `(relevant_url, origin_url, depth)` triple.
 
-## System Architecture
+## 📁 Project Structure
 
-```
-┌─────────────┐     ┌──────────┐     ┌─────────┐
-│   Crawler   │────▶│  Indexer  │────▶│ Storage │
-│ (goroutines)│     │(goroutine)│     │(RWMutex)│
-└─────────────┘     └──────────┘     └────┬────┘
-                                          │
-                                    ┌─────▼─────┐
-                               ┌────│  Search    │
-                               │    │  Engine    │
-                               │    └─────┬─────┘
-                               │          │
-                               │    ┌─────▼─────┐
-                               │    │  Ranker    │
-                               │    └───────────┘
-                               │
-                         ┌─────▼─────┐
-                         │ HTTP API  │
-                         │ :8080     │
-                         └───────────┘
+```bash
+.
+├── agents/             # Multi-agent role definitions & prompts
+├── crawler/            # Concurrent BFS crawling logic
+├── indexer/            # Real-time tokenization & index pipeline
+├── search/             # Query processing & relevance scoring
+├── storage/            # Thread-safe storage with RWMutex
+├── main/               # Application entry point
+├── multi_agent_workflow.md  # Detailed agent interaction log
+└── product_prd.md      # Project requirements & features
 ```
 
-### Components
-
-| Component | Package | Responsibility |
-|-----------|---------|---------------|
-| **Crawler** | `crawler/` | Concurrent BFS crawl with worker pool, depth/origin tracking, rate limiting |
-| **Indexer** | `indexer/` | Live tokenization and inverted index construction |
-| **Search Engine** | `search/` | Query parsing, index lookup, result deduplication |
-| **Ranker** | `ranking/` | Relevancy scoring (title match + keyword frequency) |
-| **Storage** | `storage/` | Thread-safe in-memory page store, inverted index, and persistence |
-| **Main/API** | `main/` | HTTP server, component orchestration, dashboard UI |
-
----
-
-## Dashboard
-
-The system includes a real-time web dashboard with three tabs:
-
-- ** Create Crawler** — Configure and launch crawlers from the UI with Origin URL, Max Depth, Workers, Hit Rate, Queue Capacity, and Max URLs to Visit.
-- ** Search** — Search indexed pages in real-time while crawling continues.
-- ** Crawler Status** — Monitor live metrics including indexing progress, queue depth, back-pressure status, and crawler metadata.
-
-A stats bar at the top shows URLs Visited, Words in DB, Active Crawlers, and Total Created with a Clear button.
-
----
-
-## Concurrency Model
-
-### Goroutines & Channels
-- **Worker Pool**: The crawler launches N goroutines (configurable), each reading `CrawlTask` structs from a shared channel.
-- **Page Channel**: Crawled pages flow from workers → indexer goroutine via a buffered `chan *PageData`.
-- **Indexer Goroutine**: A single goroutine processes pages from the channel, building the inverted index.
-
-### Thread Safety
-- **`sync.RWMutex`**: Protects the pages map and inverted index in storage. Read locks allow concurrent search queries; write locks ensure safe page/index updates.
-- **`sync.Mutex`**: Protects the crawler's visited-URL set and statistics counters.
-- **No data races**: All shared state access is serialized through locks or channels.
-
-### Back-Pressure
-- Queue capacity is configurable (default: `workers × 10`).
-- Three levels: **NORMAL** (< 50%), **MODERATE** (50-80%), **HIGH** (> 80%).
-- Blocking channel send prevents unbounded queue growth.
-
-### Rate Limiting
-- **Hit Rate**: Configurable requests-per-second using a shared `time.Ticker`.
-- All workers share the ticker, so Setting `hit_rate=2` means 2 total requests/second across all workers.
-
-```
-Time ──────────────────────────────────────────────▶
-
-Worker 1:  [fetch]──[parse]──[send to indexer]──[fetch next]──...
-Worker 2:  [fetch]──[parse]──[send to indexer]──[fetch next]──...
-Worker N:  [fetch]──[parse]──[send to indexer]──[fetch next]──...
-
-Indexer:   .........[tokenize]──[write index]──[tokenize]──...
-
-HTTP API:  ...[search query]──[read index]──[respond]──...
-```
-
----
-
-## Project Structure
-
-```
-project/
-├── crawler/
-│   └── crawler.go         # Concurrent BFS crawler with worker pool & rate limiting
-├── indexer/
-│   └── indexer.go         # Live tokenizer and inverted index builder
-├── search/
-│   └── search.go          # Query engine with dedup and ranking
-├── ranking/
-│   └── ranker.go          # Relevancy scoring heuristic
-├── storage/
-│   ├── storage.go         # Thread-safe in-memory store + inverted index
-│   └── persistence.go     # Save/load crawl state to disk for resume
-├── main/
-│   ├── main.go            # HTTP API server & orchestrator
-│   └── dashboard.html     # Real-time web dashboard UI
-├── data/                  # Persisted crawl state (auto-generated)
-├── go.mod
-## Project Documentation
-
-This project includes comprehensive documentation to meet professional standards:
-
-- **[README.md](README.md)**: This guide (How to run/use).
-- **[product_prd.md](product_prd.md)**: Detailed Product Requirements Document.
-- **[ai_prd.md](ai_prd.md)**: Technical Blueprints & Prompt Specification for AI maintenance.
-- **[recommendation.md](recommendation.md)**: Future roadmap and production scaling advice.
-
----
-
-## Getting Started
+## 🛠️ Installation & Usage
 
 ### Prerequisites
-- Go 1.21+
+- Go 1.18 or higher
 
-### Build & Run
-
+### Running the System
 ```bash
-# Navigate to the project directory
-cd ai-aided-hw
-
-# Download dependencies
-go mod tidy
-
-# Run the system (opens dashboard UI, waits for crawler creation via UI)
-go run ./main/ --port=8080
-
-# Or auto-start a crawler via CLI flags
-go run ./main/ --seed=https://go.dev --depth=2 --workers=5 --port=8080
+go run main/main.go --url https://example.com --depth 2 --workers 10
 ```
 
-Then open **http://localhost:8080** to access the dashboard.
+### Searching
+You can perform searches even while the crawl is active. Use the provided CLI or API interface to query the system.
 
-### Run with Docker
+## 🤖 Multi-Agent Development Workflow
 
-You can easily run the crawler using Docker. A `Dockerfile` and `docker-compose.yml` are provided.
+This project was developed by mapping the architecture into a multi-agent system. Each component was "designed" by a specialized AI agent:
 
-```bash
-# Build and start the container in detached mode
-docker-compose up -d
+- **Planner Agent:** Established the system backbone and sync strategies.
+- **Crawler Agent:** Optimized the worker pool and deduplication logic.
+- **Indexing Agent:** Designed the `keyword -> []URL` map and persistence.
+- **Search Agent:** Implemented the ranking algorithm and concurrent search locks.
+- **Reviewer Agent:** Performed stress-testing analysis and verified thread-safety.
 
-# Check the logs
-docker-compose logs -f
+For a full breakdown of agent prompts and decisions, see [multi_agent_workflow.md](./multi_agent_workflow.md).
 
-# Stop the container
-docker-compose down
-```
-The persistence data is automatically mapped to the `./data` folder on your host machine to ensure your crawls are saved across container restarts.
+## 📊 Design Decisions: Searching While Indexing
 
-### Command-Line Flags
+To ensure the search engine is operational during a crawl:
+1. **Shared State:** All data is held in a central `Storage` struct.
+2. **Locking Strategy:** We use `sync.RWMutex`. 
+   - **Indexer:** Takes a `Lock()` (write) while updating terms.
+   - **Searcher:** Takes a `RLock()` (read) while processing queries.
+3. **Incremental Updates:** New pages are indexed as soon as they are fetched, making results available immediately.
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--seed` | *(empty)* | Starting URL (empty = wait for UI) |
-| `--depth` | `2` | Maximum crawl depth (BFS levels) |
-| `--workers` | `5` | Number of concurrent crawler goroutines |
-| `--port` | `8080` | HTTP server port |
-| `--data-dir` | `./data` | Directory to persist crawl state |
-
----
-
-## API Usage
-
-### Create a Crawler (from API)
-
-```bash
-curl -X POST http://localhost:8080/crawl \
-  -H "Content-Type: application/json" \
-  -d '{"origin_url":"https://go.dev","max_depth":2,"workers":5,"hit_rate":2,"max_urls":100}'
-```
-
-### Search
-
-```bash
-curl "http://localhost:8080/search?q=go+programming"
-```
-
-**Response:**
-```json
-{
-  "query": "go programming",
-  "count": 3,
-  "results": [
-    {
-      "relevant_url": "https://go.dev/learn/",
-      "origin_url": "https://go.dev",
-      "depth": 1,
-      "score": 15.0
-    }
-  ]
-}
-```
-
-### Status
-
-```bash
-curl "http://localhost:8080/status"
-```
-
-### Stop Active Crawler
-
-```bash
-curl -X POST http://localhost:8080/stop
-```
-
-### Clear All Data
-
-```bash
-curl -X POST http://localhost:8080/clear
-```
-
----
-
-## Persistence (Bonus)
-
-The system automatically saves crawl state to disk every 10 seconds. On restart, it restores previously crawled pages, re-indexes them, and resumes crawling from unvisited child links.
-
-- State file: `data/crawl_state.json`
-- Atomic writes via temp file + rename to prevent corruption
-- Graceful shutdown performs a final save on SIGINT/SIGTERM
-
----
-
-## Ranking Formula
-
-```
-score = 2 × (title_match_count) + 1 × (body_keyword_frequency)
-```
-
-- **Title match count**: Number of query tokens appearing in the page title.
-- **Body keyword frequency**: Total occurrences of all query tokens in the page body text.
-
-The weight constants are configurable in `ranking/ranker.go`.
-
----
-
-## License
-
+## 📜 License
 MIT

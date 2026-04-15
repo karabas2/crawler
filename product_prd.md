@@ -1,137 +1,52 @@
-# Product Requirements Document (PRD)
+# Product Requirements Document (PRD) - Multi-Agent Web Crawler & Search
 
-## Concurrent Web Crawler & Search Engine
+## 1. Project Overview
+This project is a high-performance, single-machine web crawler and search engine implemented in Go. It allows users to crawl the web starting from a seed URL up to a depth of `k` hops, index the content in real-time, and perform concurrent searches on the indexed data. 
 
----
+The development of this system follows a **Multi-Agent AI Workflow**, where distinct AI agents collaborate to design, implement, and review the technical architecture.
 
-## 1. Overview
+## 2. Target Audience
+- Academic evaluators for Project 2.
+- Developers looking for a concurrent search engine reference implementation.
 
-This document defines the product requirements for a minimal concurrent web crawler and search engine system. The system crawls web pages starting from a seed URL, indexes their content in real-time, and exposes a search API that can be queried while crawling is still in progress.
+## 3. Core Features
 
----
+### 3.1 Concurrent BFS Crawling
+- **Recursive Depth (k):** Limits the crawl to `k` steps from the seed URL.
+- **URL Deduplication:** Uses a thread-safe map to ensure each unique URL is only crawled once.
+- **Worker Pool:** Utilizes a pool of concurrent goroutines to fetch pages.
+- **Back-Pressure:** Monitors the task queue and adjusts processing speed (NORMAL, MODERATE, HIGH states) to manage system load.
 
-## 2. Goals
+### 3.2 Real-Time Indexing
+- **Inverted Index:** Maps keywords found in the title and body ofpages to their corresponding URLs.
+- **Tokenization:** Normalizes text (lowercase, whitespace splitting) for efficient matching.
+- **Pipeline:** Crawler sends pages to a dedicated Indexer via Go channels.
 
-- **Concurrent Crawling**: Crawl multiple web pages simultaneously using a configurable worker pool.
-- **Live Indexing**: Index pages as they are crawled, making them immediately searchable.
-- **Search API**: Provide an HTTP endpoint that returns ranked search results as (relevant_url, origin_url, depth) triples.
-- **Modular Architecture**: Separate concerns into distinct, testable components.
-- **Thread Safety**: Ensure all shared data structures are safe for concurrent access.
+### 3.3 Information Retrieval (Search)
+- **Keyword Search:** Finds relevant pages based on query tokens.
+- **Relevance Scoring:** Ranks results based on occurrences of query terms.
+- **Triple Output:** Every search result includes `(relevant_url, origin_url, depth)`.
+- **Concurrent Access:** Searching is fully functional while the indexer is actively writing to the index.
 
----
+### 3.4 Persistence & Stats
+- **Thread-Safe Storage:** Uses `sync.RWMutex` to manage shared state across Crawler, Indexer, and Search components.
+- **Metric Tracking:** Tracks URLs processed, failed, and currently queued.
 
-## 3. User Stories
+## 4. Technical Constraints
+- **Language:** Go 1.18+ (Standard Library preferred).
+- **Concurrency:** Must use native Go concurrency primitives (Channels, Mutexes, Goroutines).
+- **Architecture:** Single-machine execution.
 
-| ID | Story | Priority |
-|----|-------|----------|
-| US-1 | As a user, I can start the crawler with a seed URL and it begins fetching pages concurrently. | Must-have |
-| US-2 | As a user, I can search for keywords via the HTTP API while the crawler is still running. | Must-have |
-| US-3 | As a user, I receive search results ranked by relevancy with URL, origin, and depth info. | Must-have |
-| US-4 | As a user, I can check the crawl status (pages crawled, pages indexed) via the API. | Should-have |
-| US-5 | As a user, I can configure crawl depth, worker count, and server port via CLI flags. | Should-have |
-| US-6 | As a user, I can gracefully stop the system with Ctrl+C. | Should-have |
+## 5. Multi-Agent Development Workflow
+The system design was achieved through the interaction of:
+1. **Planner Agent:** Architectural strategy and constraints.
+2. **Crawler Agent:** Concurrency and BFS implementation.
+3. **Indexing Agent:** Inverted index and tokenization design.
+4. **Search Agent:** Query processing and ranking.
+5. **Reviewer Agent:** Race condition detection and design critique.
 
----
-
-## 4. Functional Requirements
-
-### 4.1 Crawler
-- FR-1: Accept a configurable seed URL as the starting point.
-- FR-2: Perform BFS traversal up to a configurable maximum depth.
-- FR-3: Track the origin URL (parent) and depth for every discovered page.
-- FR-4: Use a configurable number of worker goroutines for concurrent fetching.
-- FR-5: Avoid re-crawling already-visited URLs.
-- FR-6: Parse HTML to extract page title, body text, and outbound links.
-- FR-7: Resolve relative URLs to absolute URLs.
-- FR-8: Filter out non-HTTP/HTTPS links, fragments, and javascript: URLs.
-
-### 4.2 Indexer
-- FR-9: Receive crawled pages in real-time via a channel.
-- FR-10: Tokenize page title and body text into lowercase terms.
-- FR-11: Remove common English stop words.
-- FR-12: Build an inverted index mapping tokens to pages.
-- FR-13: Deduplicate tokens per page before indexing.
-
-### 4.3 Search Engine
-- FR-14: Accept a query string and tokenize it.
-- FR-15: Look up each query token in the inverted index.
-- FR-16: Merge and deduplicate results across tokens.
-- FR-17: Score results using the ranking heuristic.
-- FR-18: Return results sorted by score descending.
-- FR-19: Return results as (relevant_url, origin_url, depth, score) tuples.
-
-### 4.4 Ranking
-- FR-20: Score = 2 × (title match count) + 1 × (body keyword frequency).
-- FR-21: Title match = number of query tokens appearing in the page title.
-- FR-22: Body frequency = total occurrences of query tokens in page body.
-
-### 4.5 HTTP API
-- FR-23: `GET /search?q=<query>` returns JSON search results.
-- FR-24: `GET /status` returns crawl statistics as JSON.
-- FR-25: Return appropriate HTTP error codes (400 for missing query).
-
----
-
-## 5. Non-Functional Requirements
-
-| ID | Requirement | Target |
-|----|-------------|--------|
-| NFR-1 | **Concurrency Safety** | Zero data races under concurrent crawl + search. |
-| NFR-2 | **Response Time** | Search queries respond in < 100ms for indexes up to 10k pages. |
-| NFR-3 | **Memory** | Limit page body to 1MB to prevent memory exhaustion. |
-| NFR-4 | **HTTP Timeout** | 10-second timeout per crawl request. |
-| NFR-5 | **Graceful Shutdown** | Stop crawling and shut down the server on SIGINT/SIGTERM. |
-| NFR-6 | **Modularity** | Each component in its own package with clear interfaces. |
-
----
-
-## 6. Architecture
-
-```
-Seed URL → Crawler (N workers) → [Channel] → Indexer → Storage (Inverted Index)
-                                                              ↕
-                                              HTTP API → Search Engine → Ranker
-```
-
-### Component Interactions
-1. **Crawler → Indexer**: Pages flow via a buffered Go channel.
-2. **Indexer → Storage**: Tokens are written to the inverted index (write-locked).
-3. **Search → Storage**: Queries read the inverted index (read-locked).
-4. **Search → Ranker**: Each candidate page is scored by the ranker.
-
----
-
-## 7. Data Models
-
-### PageData
-```go
-type PageData struct {
-    URL       string
-    Title     string
-    Body      string
-    Links     []string
-    OriginURL string
-    Depth     int
-}
-```
-
-### SearchResult
-```go
-type Result struct {
-    RelevantURL string
-    OriginURL   string
-    Depth       int
-    Score       float64
-}
-```
-
----
-
-## 8. Acceptance Criteria
-
-- [ ] System starts crawling from the seed URL and discovers linked pages.
-- [ ] Search API returns results while crawling is actively running.
-- [ ] Results include relevant_url, origin_url, and depth for each match.
-- [ ] Results are ranked by score (higher = more relevant).
-- [ ] No data races when crawling and searching concurrently.
-- [ ] System shuts down gracefully on Ctrl+C.
+## 6. Success Criteria
+- [x] Complete crawl up to depth `k` without infinite loops.
+- [x] Search remains responsive during heavy crawling.
+- [x] Search results include the required metadata triples.
+- [x] Documented agentic collaboration process.
