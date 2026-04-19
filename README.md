@@ -1,4 +1,6 @@
 # Multi-Agent Web Crawler & Search Engine
+**Repository:** [karabas2/crawler](https://github.com/karabas2/crawler)
+
 
 A high-performance search engine and web crawler implemented in Go, designed through a collaborative Multi-Agent AI Workflow. This system demonstrates complex concurrency patterns, real-time incremental indexing, and thread-safe search operations.
 
