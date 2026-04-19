@@ -19,17 +19,17 @@ This project is built from the ground up to handle large-scale crawling on a sin
 - **Inverted Indexing:** Maps lowercase keywords to URL locations, optimized for retrieval.
 - **Triple-Metadata Search:** Returns results with `(relevant_url, origin_url, depth)` as required by assignment specs.
 
-## 🤖 Multi-Agent Development Workflow
+## 🤖 Agentic System Design
 
-This system's design was mapped into a multi-agent development lifecycle:
+Bu proje sadece kod üretmek için değil, **otonom bir agent hiyerarşisinin** karmaşık bir mühendislik problemini nasıl çözdüğünü kanıtlamak için tasarlanmıştır. Sistem, her biri kendi uzmanlık alanına sahip 5 farklı AI ajanının işbirliğiyle geliştirilmiştir:
 
-1.  **Planner Agent:** Designed the package structure and inter-service communication.
-2.  **Crawler Agent:** Developed the BFS core and worker pool concurrency logic.
-3.  **Indexing Agent:** Built the tokenization pipeline and inverted index storage.
-4.  **Search Agent:** Implemented the relevance scoring and read-locked query processor.
-5.  **Reviewer Agent:** Audited code for race conditions and verified back-pressure integrity.
+-  **Strategic Planner:** Sistem mimarisini (Shared State Architecture) kurguladı ve `crawler`, `indexer`, `search` modülleri arasındaki veri akışını (Channel Pipeline) yönetti.
+-  **Concurrency Specialist (Crawler Agent):** BFS algoritmasını, Go'nun yerel eşzamanlılık (concurrency) araçlarını (WaitGroup, Ticker) kullanarak "Back-Pressure" mekanizmasıyla birlikte inşa etti.
+-  **Data Architect (Indexing Agent):** İndeksleme sürecini otonom hale getirerek Unicode destekli tokenization ve gerçek zamanlı (live-indexing) veri yazımını sağladı.
+-  **UX & Product Agent (Searcher Agent):** Arama sonuçlarının ödev gereksinimlerine uygun olarak `triple` (URL, Origin, Depth) formatında dönmesini ve aramanın indeksleme sırasında asla kilitlenmemesini (RWMutex stratejisi) sağladı.
+-  **QA & Safety Supervisor (Reviewer Agent):** Kodun "Race Condition" analizlerini yaptı ve sistemin aşırı yük altında (`HIGH` back-pressure) nasıl davranması gerektiğini dikte etti.
 
-> See [multi_agent_workflow.md](./multi_agent_workflow.md) for the full agentic reasoning log.
+> Detaylı ajan karar logları ve tasarım felsefesi için [AGENT_SYSTEM_DESIGN.md](./agents/AGENT_SYSTEM_DESIGN.md) dosyasını inceleyebilirsiniz.
 
 ## 📁 Repository Structure
 
@@ -58,10 +58,17 @@ This system's design was mapped into a multi-agent development lifecycle:
    ```bash
    go mod tidy
    ```
-3. Run a crawl:
+3. Start the Agentic Server:
    ```bash
-   go run main/main.go --url https://example.com --depth 3 --workers 20
+   go run main/main.go
    ```
+4. Access the Dashboard:
+   Open your browser to [http://localhost:8888](http://localhost:8888)
+
+### API Endpoints
+- **POST `/crawl`**: Start a new task with `{"origin_url": "...", "max_depth": 2, "workers": 5}`.
+- **GET `/search?q=query`**: Retrieve ranked triples.
+- **GET `/status`**: View live metrics (Queue depth, Back-pressure).
 
 ## 📊 Concurrent Search During Indexing
 

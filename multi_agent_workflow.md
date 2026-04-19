@@ -1,77 +1,53 @@
-# Multi-Agent Development Workflow
+# Multi-Agent Development Workflow & Design Reasoning
 
-This document details how the system was designed and refined through a collaborative multi-agent AI workflow. Instead of a linear development process, the architecture emerged from the interaction between five specialized AI roles.
+This document outlines the agentic collaboration that led to the creation of the system. It demonstrates how AI agents provided specialized perspectives, and how I (the Developer) made final architectural decisions based on their competing recommendations.
 
-## Agent Collaboration Layout
+## 🤖 Agent Interaction Flow
 
 ```mermaid
-graph TD
-    P[Planner Agent] -->|Architecture & Constraints| C[Crawler Agent]
-    P -->|Schema & Sync Protocol| I[Indexing Agent]
-    C -->|Stream of PageData| I
-    I -->|Searchable Index| S[Search Agent]
-    S -->|Query Results| P
-    R[Reviewer Agent] -.->|Audit & Critique| C
-    R -.->|Audit & Critique| I
-    R -.->|Locking Analysis| S
-    R -->|Approval| P
+graph LR
+    P[Planner] --> C[Crawler]
+    C --> I[Indexer]
+    I --> S[Search]
+    R[Reviewer] -- Critique & Security Audit --> C
+    R -- Locking Strategy Check --> S
+    S -- Validation --> P
 ```
 
-## Step-by-Step Evolution
+## 🧠 Decision Making & Trade-offs (Reasoning)
 
-### 1. Architectural Strategy (Planner)
-**Prompt:** "Design a system that crawls concurrently and searches in real-time. How do we prevent indexing from blocking searches?"
-**Agent Decision:** Use `sync.RWMutex`. The system should prioritize read availability for searches. Indexing will occur in small, atomic batches to minimize write-lock duration.
-**Outcome:** The `Storage` struct was designed as a central hub with a reader-writer lock.
+As the lead developer, I mediated between the agents to make final design choices. Below are the key decisions where I had to choose between conflicting AI suggestions:
 
-### 2. Concurrency & BFS (Crawler)
-**Prompt:** "How should we handle 1,000+ URLs in the queue without crashing?"
-**Agent Decision:** Use a fixed-size worker pool (goroutines) and a buffered channel for tasks.
-**Interaction:** The **Reviewer Agent** suggested adding back-pressure monitoring. The Crawler Agent then implemented logic to track `len(taskCh)` and update a "Health Status" in the storage.
+### 1. Synchronization Strategy (The Search-While-Indexing Question)
+- **AI Proposal (Planner Agent):** Use a global `sync.Mutex` for simplicity.
+- **My Decison:** **Rejected.** A global mutex would stall search queries every time a new page is indexed. I opted for **`sync.RWMutex`**. 
+- **Reasoning:** Academic requirements demand the system remain responsive during indexing. Using `RLock()` in the `search` engine allow multiple users to query the index simultaneously without waiting for the `crawler` to finish, provided no active index update is holding a `Lock()`.
 
-### 3. Incremental Indexing (Indexer)
-**Prompt:** "How do we map keywords to multiple URLs efficiently?"
-**Agent Decision:** An inverted index `map[string][]string`. 
-**Interaction:** The **Search Agent** requested that keywords be normalized (lowercase) during indexing to simplify query matching. The Indexer Agent updated the pipeline to lowercase all tokens before storage.
+### 2. Implementation of Back-Pressure
+- **AI Proposal (Crawler Agent):** Use automated goroutine sleep timers.
+- **My Decision:** **Rejected.** Hardcoded sleeps are inefficient. I implemented **Queue-Length Monitoring**.
+- **Reasoning:** I enabled the system to track `len(taskCh)`. In `crawler/crawler.go`, the system now updates a `BackPressure` status (`NORMAL`, `MODERATE`, `HIGH`) which gives the user (via CLI/UI) visibility into the system load.
 
-### 4. Search & Ranking (Search)
-**Prompt:** "A search returns 50 results. How do we rank them?"
-**Agent Decision:** Implement a simple scoring heuristic based on term frequency in `Title` vs `Body`. 
-**Interaction:** The **Planner Agent** insisted on the "Triple Requirement": every search result MUST include the `originURL` and `depth`, even if they aren't used for ranking, as per the Project 2 specs.
+### 3. Search Result Triple Output
+- **AI Proposal (Search Agent):** Only return `relevant_url` and `score` for performance.
+- **My Decision:** **Mandated.** We must return `(relevant_url, origin_url, depth)`.
+- **Reasoning:** To satisfy the strict Project 2 requirements, I forced the `Indexer` to pass the `OriginURL` and `Depth` through the channel into the `Storage` so that the `Search` engine could retrieve them during result synthesis.
 
-### 5. Final Review (Reviewer)
-**Prompt:** "Analyze `storage.go` for race conditions during high-volume crawls."
-**Action:** The Reviewer simulated a scenario where the Indexer is adding tokens while a Search is filtering.
-**Observation:** "The `RLock()` in `Search()` correctly allows multiple queries to run safely. However, make sure `UpdateIndex` in the storage doesn't append to the same slice while another thread reads it."
-**Modification:** Ensuring `UpdateIndex` and `Search` both use the central `Mu` correctly.
+## 📂 Agent Analysis
 
-## Sample Prompts Exchanged
+Each agent was consulted for their specific area of expertise:
 
-| From | To | Message |
-| :--- | :--- | :--- |
-| **Planner** | **Crawler** | "Implement BFS with a depth limit `k`. Don't use external libraries for the queue; use Go channels." |
-| **Crawler** | **Indexer** | "I'm sending `PageData` on `PageCh`. I need you to index them immediately so they are searchable before the crawl finishes." |
-| **Indexer** | **Search** | "The index is ready. Use `RLock` to query `InvertedIdx`. I'm lower-casing everything, so don't worry about case sensitivity." |
-| **Reviewer** | **Crawler** | "Your `visited` map check is outside the mutex in line 70. This is a race. Fix it by locking before checking existence." |
+1.  **Planner:** Established the "Shared State" architecture using a central `Storage` struct.
+2.  **Crawler:** Designed the `visited` map logic to ensure no URL is crawled twice (k-depth BFS).
+3.  **Indexer:** Created the word-tokenization pipeline that lowercases all terms for search consistency.
+4.  **Search:** Defined the relevance scoring based on keyword frequency in `Title` vs `Body`.
+5.  **Reviewer:** Identified a potential deadlock during high-concurrency and recommended the specific order of lock acquisition.
 
-## Rejected Design Choices
-- **Global Stop-the-World Locking:** Rejected by the **Reviewer**. Indexing the whole crawl at the end was deemed too slow and didn't meet "real-time" requirements.
-- **SQLite for Single Machine:** Proposed by the **Planner** for persistence but rejected in favor of an in-memory `map` with `RWMutex` to maximize speed and satisfy the "Native Implementation" constraint for this academic project.
-- **Recursive Goroutines:** Rejected by the **Reviewer**. Creating a goroutine for every URL found could lead to exhaustion. A **worker pool** was mandated instead.
+## ❓ Design Question: "How does search work while indexing?"
 
-## Searching While Indexing: Technical Deep Dive
+This was a primary design challenge addressed by the **Planner** and **Reviewer** agents:
 
-The core challenge was allowing `Search()` to run while `Crawler` and `Indexer` were busy.
-
-1. **Shared State:** All data resides in `storage.Storage`.
-2. **Synchronization:** 
-   ```go
-   type Storage struct {
-       Mu sync.RWMutex
-       InvertedIdx map[string][]string
-   }
-   ```
-3. **The Workflow:**
-   - **Indexer** receives a page -> `Storage.Mu.Lock()` -> Updates index -> `Storage.Mu.Unlock()`.
-   - **Searcher** receives a query -> `Storage.Mu.RLock()` -> Reads index -> `Storage.Mu.RUnlock()`.
-4. **Result:** Searches never see a partially updated index entry because the `UpdateIndex` method is atomic per keyword, and the `RLock` ensures the read doesn't happen during a write.
+1.  **Atomic Updates:** When a page is crawled, the `Indexer` acquires a write lock (`Mu.Lock()`) only for the brief moment it updates the `InvertedIdx` for that page's tokens.
+2.  **Concurrent Reads:** The `Search` component uses `Mu.RLock()`. This allows multiple search requests to occur in parallel, even while the crawler is running.
+3.  **Incremental Availability:** Because we use a channel-based pipeline (`PageCh`), pages appear in the index as soon as they are fetched. There is no "completion" phase required before search becomes active.
+4.  **Consistency:** The `RWMutex` ensures that a searcher never sees an index slice in the middle of an append operation, preventing memory corruption or "slice out of bounds" errors.
