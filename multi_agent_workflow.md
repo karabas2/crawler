@@ -2,7 +2,7 @@
 
 This document outlines the agentic collaboration that led to the creation of the system. It demonstrates how AI agents provided specialized perspectives, and how I (the Developer) made final architectural decisions based on their competing recommendations.
 
-## 🤖 Agent Interaction Flow
+## Agent Interaction Flow
 
 ```mermaid
 graph LR
@@ -14,7 +14,7 @@ graph LR
     S -- Validation --> P
 ```
 
-## 🧠 Decision Making & Trade-offs (Reasoning)
+## Decision Making & Trade-offs (Reasoning)
 
 As the lead developer, I mediated between the agents to make final design choices. Below are the key decisions where I had to choose between conflicting AI suggestions:
 
@@ -33,7 +33,7 @@ As the lead developer, I mediated between the agents to make final design choice
 - **My Decision:** **Mandated.** We must return `(relevant_url, origin_url, depth)`.
 - **Reasoning:** To satisfy the strict Project 2 requirements, I forced the `Indexer` to pass the `OriginURL` and `Depth` through the channel into the `Storage` so that the `Search` engine could retrieve them during result synthesis.
 
-## 📂 Agent Analysis
+## Agent Analysis
 
 Each agent was consulted for their specific area of expertise:
 
@@ -43,7 +43,7 @@ Each agent was consulted for their specific area of expertise:
 4.  **Search:** Defined the relevance scoring based on keyword frequency in `Title` vs `Body`.
 5.  **Reviewer:** Identified a potential deadlock during high-concurrency and recommended the specific order of lock acquisition.
 
-## ❓ Design Question: "How does search work while indexing?"
+## Design Question: "How does search work while indexing?"
 
 This was a primary design challenge addressed by the **Planner** and **Reviewer** agents:
 
